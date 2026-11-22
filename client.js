@@ -149,6 +149,16 @@ if (!window.__dshSmbPickerInstalled) {
 				const query = new URLSearchParams({ id: connectionId, path });
 				return `${API}.raw?${query.toString()}`;
 			}
+
+			/**
+			 * URL for a downscaled preview. The grid never loads originals: one PNG
+			 * off a NAS is around a megabyte, and a screenful of them is the whole
+			 * reason browsing felt slow.
+			 */
+			function thumbUrl(connectionId, path, width = 400) {
+				const query = new URLSearchParams({ id: connectionId, path, w: String(width) });
+				return `${API}.thumb?${query.toString()}`;
+			}
 			//#endregion
 
 			//#region components
@@ -215,7 +225,7 @@ if (!window.__dshSmbPickerInstalled) {
 					},
 				},
 					preview
-						? h(LazyImage, { src: rawUrl(connectionId, fullPath), alt: entry.name })
+						? h(LazyImage, { src: thumbUrl(connectionId, fullPath), alt: entry.name })
 						: h('div', { className: 'dsh-smb-fallback' }, h(Icon, { path: ICON_FILE })),
 					h('div', { className: 'dsh-smb-name' }, entry.name),
 					selected ? h('div', { className: 'dsh-smb-tick' }, h(Icon, { path: ICON_CHECK })) : null);
@@ -562,7 +572,7 @@ if (!window.__dshSmbPickerInstalled) {
 								className: 'dsh-smb-preview',
 								onMouseDown: (event) => { if (event.target === event.currentTarget) setPreviewing(''); },
 							},
-								h('img', { src: rawUrl(connectionId, previewing), alt: previewing }),
+								h('img', { src: thumbUrl(connectionId, previewing, 1200), alt: previewing }),
 								h('button', { type: 'button', className: 'dsh-smb-iconbtn', title: '关闭', onClick: () => setPreviewing('') }, h(Icon, { path: ICON_CLOSE })))
 							: null));
 			}

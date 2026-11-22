@@ -20,58 +20,16 @@ Every operation is read-only: this worker never writes to the share.
 
 from __future__ import annotations
 
+import io
 import json
-import re
 import stat as stat_module
 import sys
 
+import PIL.Image
+import PIL.ImageOps
 import smbclient
 
-
-def fail(code: str, message: str, status: str | None = None) -> "NoReturn":
-    payload = {"code": code, "message": message}
-    if status is not None:
-        payload["status"] = status
-    sys.stderr.write(json.dumps(payload, ensure_ascii=False))
-    sys.stderr.flush()
-    raise SystemExit(1)
-
-
-def classify(error: Exception) -> tuple[str, str | None]:
-    """Map a protocol refusal onto the codes the Host already explains.
-
-    `smbprotocol` reports the NTSTATUS inside the message text
-    (`[NtStatus 0xc0000034]`), so the code is the reliable discriminator; the
-    prose around it differs between dialects and locales.
-    """
-    text = str(error)
-    match = re.search(r"0x([0-9a-fA-F]{8})", text)
-    status = f"0x{match.group(1).upper()}" if match else None
-    by_status = {
-        "0xC000006D": "auth_failed",   # STATUS_LOGON_FAILURE
-        "0xC000006A": "auth_failed",   # STATUS_WRONG_PASSWORD
-        "0xC0000022": "denied",        # STATUS_ACCESS_DENIED
-        "0xC0000061": "denied",        # STATUS_PRIVILEGE_NOT_HELD
-        "0xC00000CC": "no_such_share", # STATUS_BAD_NETWORK_NAME
-        "0xC0000225": "no_such_share", # STATUS_NOT_FOUND (tree connect)
-        "0xC0000034": "not_found",     # STATUS_OBJECT_NAME_NOT_FOUND
-        "0xC000003A": "not_found",     # STATUS_OBJECT_PATH_NOT_FOUND
-        "0xC000000F": "not_found",     # STATUS_NO_SUCH_FILE
-        "0xC0000103": "wrong_type",    # STATUS_NOT_A_DIRECTORY
-        "0xC00000BA": "wrong_type",    # STATUS_FILE_IS_A_DIRECTORY
-    }
-    if status is not None and status in by_status:
-        return by_status[status], status
-    lowered = text.lower()
-    if "logon" in lowered or "authentication" in lowered:
-        return "auth_failed", status
-    if "access is denied" in lowered or "access_denied" in lowered:
-        return "denied", status
-    if "bad network name" in lowered or "bad_network_name" in lowered:
-        return "no_such_share", status
-    if "no such file" in lowered or "not found" in lowered:
-        return "not_found", status
-    return "smb_error", status
+from smb_common import MAX_THUMB_SOURCE_BYTES, classify, share_target
 
 
 def main() -> None:
@@ -115,8 +73,7 @@ def main() -> None:
             json.dump({"shares": rows}, sys.stdout, ensure_ascii=False)
 
         elif op == "list":
-            root = f"\\\\{host}\\{share}"
-            target = f"{root}\\{path}" if path else root
+            target = share_target(host, share, path)
             rows = []
             for entry in smbclient.scandir(target):
                 rows.append({
@@ -126,22 +83,38 @@ def main() -> None:
             json.dump({"entries": rows}, sys.stdout, ensure_ascii=False)
 
         elif op == "stat":
-            root = f"\\\\{host}\\{share}"
-            target = f"{root}\\{path}" if path else root
+            target = share_target(host, share, path)
             info = smbclient.stat(target)
             json.dump({"size": info.st_size, "directory": stat_module.S_ISDIR(info.st_mode)}, sys.stdout)
 
         elif op == "read":
-            root = f"\\\\{host}\\{share}"
-            target = f"{root}\\{path}"
-            written = 0
+            target = share_target(host, share, path)
             with smbclient.open_file(target, mode="rb") as handle:
                 while True:
                     chunk = handle.read(262144)
                     if not chunk:
                         break
                     sys.stdout.buffer.write(chunk)
-                    written += len(chunk)
+            sys.stdout.buffer.flush()
+
+        elif op == "thumb":
+            target = share_target(host, share, path)
+            width = int(settings.get("width") or 400)
+            info = smbclient.stat(target)
+            if stat_module.S_ISDIR(info.st_mode):
+                fail("wrong_type", "这是一个目录，不是文件")
+            if info.st_size > MAX_THUMB_SOURCE_BYTES:
+                fail("too_large", f"文件 {info.st_size} 字节，超过缩略图上限")
+            with smbclient.open_file(target, mode="rb") as handle:
+                source = handle.read()
+            image = PIL.Image.open(io.BytesIO(source))
+            image = PIL.ImageOps.exif_transpose(image)
+            image.thumbnail((width, width), PIL.Image.LANCZOS)
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+            out = io.BytesIO()
+            image.save(out, format="WEBP", quality=82, method=4)
+            sys.stdout.buffer.write(out.getvalue())
             sys.stdout.buffer.flush()
 
         else:
