@@ -1,0 +1,13 @@
+# Runtime state that must never be committed.
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Local diagnostics.
+*.log
+smb-picker.json
+
+# Editor / OS noise.
+.DS_Store
+*.swp

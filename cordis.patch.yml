@@ -1,0 +1,12 @@
+# dsh-smb-picker bundle patch.
+#
+# One inserted Loader row. The specifier MUST stay relative: `client-modules`
+# resolves one package per Loader row before serving that package's browsable
+# client bundle, and on a profile-installed (symlinked) copy the bare package
+# name resolves through the Loader to nothing, silently dropping `client.js`
+# from every bundle batch — the Host half still works, the button never appears.
+# A relative specifier takes the path-like branch, where the manifest is found
+# by walking up from the resolved module.
+- insert:
+    - id: smb-picker
+      name: './lib/index.js'
