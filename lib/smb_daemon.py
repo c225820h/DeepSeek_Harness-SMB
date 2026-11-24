@@ -122,7 +122,16 @@ def main() -> None:
             if op == "list":
                 rows = []
                 for entry in smbclient.scandir(share_target(host, share, path)):
-                    rows.append({"name": entry.name, "directory": entry.is_dir()})
+                    info = entry.smb_info
+                    rows.append({
+                        "name": entry.name,
+                        # FILE_ATTRIBUTE_DIRECTORY, read off the same QUERY_DIRECTORY
+                        # response — `entry.is_dir()` can cost a second round trip on
+                        # a reparse point, and a listing must not do that per entry.
+                        "directory": bool(info.file_attributes & 0x10),
+                        "size": info.end_of_file,
+                        "mtime": int(info.last_write_time.timestamp()),
+                    })
                 write_json({"id": request_id, "ok": True, "json": {"entries": rows}})
 
             elif op == "stat":

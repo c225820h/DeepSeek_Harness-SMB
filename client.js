@@ -69,6 +69,7 @@ if (!window.__dshSmbPickerInstalled) {
 .dsh-smb-fallback{width:100%;aspect-ratio:1/1;border-radius:6px;background:#eef0f4;display:flex;align-items:center;justify-content:center;color:#6b7280}
 .dsh-smb-fallback svg{width:26px;height:26px}
 .dsh-smb-name{font-size:11px;line-height:1.3;word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.6em}
+.dsh-smb-when{font-size:10px;line-height:1.2;color:#8b909b;margin-top:-2px}
 .dsh-smb-tick{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:9px;background:#2f6bff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .dsh-smb-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:100%;min-height:160px;color:#7a808c;font-size:12px;text-align:center;padding:20px}
 .dsh-smb-foot{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid #e8eaee;flex:none;background:#fff}
@@ -144,6 +145,18 @@ if (!window.__dshSmbPickerInstalled) {
 				return body;
 			}
 
+			/** Compact age for a grid cell: the whole point of sorting by time is seeing it. */
+			function relativeTime(seconds) {
+				if (!Number.isFinite(seconds) || seconds <= 0) return '';
+				const diff = Date.now() / 1000 - seconds;
+				if (diff < 60) return '刚刚';
+				if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+				if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+				if (diff < 172800) return '昨天';
+				const when = new Date(seconds * 1000);
+				return `${when.getMonth() + 1}-${String(when.getDate()).padStart(2, '0')}`;
+			}
+
 			/** Direct URL for one file's bytes, as served by the Host. */
 			function rawUrl(connectionId, path) {
 				const query = new URLSearchParams({ id: connectionId, path });
@@ -212,12 +225,14 @@ if (!window.__dshSmbPickerInstalled) {
 						h('div', { className: 'dsh-smb-name' }, entry.name));
 				}
 				const preview = entry.mediaType !== undefined && ADMITTED_IMAGE_TYPES.has(entry.mediaType);
+				const stamp = relativeTime(entry.mtime);
+				const fullStamp = Number.isFinite(entry.mtime) ? new Date(entry.mtime * 1000).toLocaleString() : '';
 				return h('button', {
 					type: 'button',
 					className: 'dsh-smb-cell',
 					'data-sel': selected ? '1' : '0',
 					'data-dir': '0',
-					title: entry.name,
+					title: fullStamp.length > 0 ? `${entry.name}\n${fullStamp}` : entry.name,
 					onClick: () => onToggle(fullPath),
 					onDoubleClick: (event) => {
 						event.preventDefault();
@@ -228,6 +243,7 @@ if (!window.__dshSmbPickerInstalled) {
 						? h(LazyImage, { src: thumbUrl(connectionId, fullPath), alt: entry.name })
 						: h('div', { className: 'dsh-smb-fallback' }, h(Icon, { path: ICON_FILE })),
 					h('div', { className: 'dsh-smb-name' }, entry.name),
+					stamp.length > 0 ? h('div', { className: 'dsh-smb-when' }, stamp) : null,
 					selected ? h('div', { className: 'dsh-smb-tick' }, h(Icon, { path: ICON_CHECK })) : null);
 			}
 
