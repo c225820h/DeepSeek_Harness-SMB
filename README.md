@@ -44,17 +44,10 @@
 ```bash
 cd <这个目录>
 npm install
-
-# Linux / macOS
-python3 -m venv .venv && .venv/bin/pip install smbprotocol Pillow
-
-# Windows（PowerShell 或 cmd）
-python -m venv .venv && .venv\Scripts\pip install smbprotocol Pillow
+python3 -m venv .venv && .venv/bin/pip install smbprotocol Pillow   # 后端 + 缩略图
 ```
 
-要 Python ≥ 3.9，且该 Python 带 `venv` 模块（Debian/Ubuntu 需另装 `python3-venv`；部分便携版 Python 去掉了 `venv`，会报 `No module named venv`，换一个完整安装即可）。`.venv` 就在插件目录里，跟着插件走。
-
-解释器路径**按平台自动识别**：Windows 先找 `.venv\Scripts\python.exe`，Linux/macOS 先找 `.venv/bin/python`，两边都会回退到对方的布局，所以手动建错位置也能跑。找不到时错误信息会列出**尝试过的全部路径**，并给出当前平台该执行的建 venv 命令。
+要 `python3` ≥ 3.9 和能建 venv 的 `python3-venv`。`.venv` 就在插件目录里，跟着插件走。
 
 然后把它挂进 profile —— 二选一：
 
