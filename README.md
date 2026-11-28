@@ -53,7 +53,7 @@ python3 -m venv .venv && .venv/bin/pip install smbprotocol Pillow   # 后端 + �
 
 ```bash
 # A. 从 GitHub 装（快照，改了要先 push 再重装）
-dsh plugin --profile web add github:c225820h/DeepSeek_Harness-SMB
+dsh plugin --profile web add github:c225820h/dsh-smb
 
 # B. 本地开发（link，改完重启即生效）
 #    ~/.dsh/profiles/web/package.json：
